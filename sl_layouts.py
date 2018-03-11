@@ -42,15 +42,18 @@ class SL_global():
 
 def sl_state(path, tags, args, source):
     if path=="/state":  #without len and pos running, works 100% without latency
-            print args[2]
+            state = int(args[2])
             print '*' * 80
-            print Soup.stat
-            print Soup.stat[args[2]]
+##            print Soup.stat
+##            print Soup.stat[args[2]]
+            print args
             
-            looplist[args[0]].state = args[2]
+            looplist[args[0]].state = state
+            print looplist[args[0]].state
+
+            print Soup.stat[state][0]            
             
-            print Soup.stat[args[2]][0]
-            client2.send( OSCMessage("/lp2", [8,args[0], 2, 2 ] ) )
+            client2.send( OSCMessage("/lp2", [8,args[0], Soup.stat[state][0], Soup.stat[state][1] ] ) )
             
     
 ##            if args[2] == 0:      #nothing, NOT loaded 
@@ -99,8 +102,8 @@ def sl_pos(path, tags, args, source):
             
             eigth_pos = int((pos / looplist[args[0]].len) * 8)
             
-            print args[0], eigth_pos
-            print 'state', looplist[args[0]].state
+            #print args[0], eigth_pos
+            #print 'state', looplist[args[0]].state
             
             client2.send( OSCMessage("/lp2", [eigth_pos ,args[0],1,0] ) )
             if eigth_pos > 0:
