@@ -24,6 +24,7 @@ class Loop():
 
         
 
+
 class SL_global():
     def __init__(self):
         self.num_loops = 1
@@ -67,32 +68,41 @@ class SL_global():
 def sl_state(path, tags, args, source):
     if path=="/state":  #without len and pos running, works 100% without latency
             state = int(args[2])
+            print 'state', state
             
             looplist[args[0]].state = state
+            print Soup.stat[state]
             
             client2.send( OSCMessage("/lp2", [8,args[0], Soup.stat[state][0], Soup.stat[state][1] ] ) )
             
 
 
-def sl_length(path, tags, args, source):  # only sends when theres a NEW length so if run this script when length is already set... issues
+def sl_length(path, tags, args, source):  # only sends when theres a NEW length based on auto_register so if run this script when length is already set... issues
     if args[1] == "loop_len":
-        print 'len', args[2]
         looplist[args[0]].len = float(args[2])
+        
+        #while recording, red lights == # of seconds recorded
+        sec = int(args[2])
+        if looplist[args[0]].state == 2 and sec < 8:
+            client2.send( OSCMessage("/lp2", (sec,args[0], 2, 0) ) )
 
 
 def sl_pos(path, tags, args, source):
+    #doesn't work till record is pressed after script is going
     if path=="/sl_pos":
         if looplist[args[0]].state != 2:
             pos =  args[2] 
             
             eigth_pos = int((pos / looplist[args[0]].len) * 8)
             
-           
-            
-
-            if looplist[args[0]].pos_eigth != eigth_pos:
-                #print args[0], eigth_pos
-                print eigth_pos, looplist[args[0]].pos_eigth
+##            this didnt work because.. position isn't sent/triggered
+##            while length is changing from length, could be called if necessary
+##            if (looplist[args[0]].state  == 2 ) == True:
+##                print "truth"
+                
+            if looplist[args[0]].pos_eigth != eigth_pos: #dont repeat values more than once
+                
+                print args[0], eigth_pos
                 
                 looplist[args[0]].pos_eigth = eigth_pos
                 
@@ -101,11 +111,7 @@ def sl_pos(path, tags, args, source):
                     client2.send( OSCMessage("/lp2", [eigth_pos - 1,args[0],0,0] ) )
                 elif eigth_pos == 0:
                     client2.send( OSCMessage("/lp2", [7 ,args[0],0,0] ) )
-            
-            elif looplist[args[0]].state == 2:
-                for i in range(8):
-                    client2.send( OSCMessage("/lp2", [i,args[0],2,0] ) )
-                        
+                                    
             
             
 def sl_callback(path, tags, args, source):
@@ -157,12 +163,16 @@ if __name__=="__main__":
 
     print '*' * 80
     print 'num of loops', Soup.num_loops
+
+    
     
     for i in range(8):     
             client.send( OSCMessage("/sl/" + str(i) + "/register_auto_update", ["loop_pos", 10, "localhost:7777", '/sl_pos'] ) )
             client.send( OSCMessage("/sl/" + str(i) + "/register_auto_update", ["state", 10, "localhost:7777", '/state'] ) )
             client.send( OSCMessage("/sl/" + str(i) + "/register_auto_update", ["loop_len", 100, "localhost:7777", '/sl_len'] ) )
 
+
+    #gotta somehow ping every once in awhile or after initial reg to make sure all loops are accounted for
 
             
     while True:
