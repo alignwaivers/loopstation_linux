@@ -14,11 +14,15 @@ def handle_error(self,request,client_address):
 
 class Loop():
     def __init__(self):
-        self.len = 0
+        self.len = 1
         
-        self.pos = 0
+        self.pos = 1
         
         self.state = 0
+
+        self.pos_eigth = 0
+
+        
 
 class SL_global():
     def __init__(self):
@@ -35,41 +39,10 @@ class SL_global():
                      [0,0],
                      [0,0],
                      [0,0] ]
+        
 
-    
-
-
-
-def sl_state(path, tags, args, source):
-    if path=="/state":  #without len and pos running, works 100% without latency
-            state = int(args[2])
-            print '*' * 80
-##            print Soup.stat
-##            print Soup.stat[args[2]]
-            print args
-            
-            looplist[args[0]].state = state
-            print looplist[args[0]].state
-
-            print Soup.stat[state][0]            
-            
-            client2.send( OSCMessage("/lp2", [8,args[0], Soup.stat[state][0], Soup.stat[state][1] ] ) )
-            
-    
-##            if args[2] == 0:      #nothing, NOT loaded 
-##                client2.send( OSCMessage("/lp", [8,args[0],0,0] ) )
-##            if args[2] == 1:      #waitstart (green)
-##                client2.send( OSCMessage("/lp", [8,args[0],1,0] ) )
-##            if args[2] == 2:      #recording (red
-##                for i in range(9):
-##                    client2.send( OSCMessage("/lp", [i,args[0],3,0] ) )
-##            if args[2] == 4:      #playing (green)
-##                client2.send( OSCMessage("/lp", [8,args[0],0,3] ) )
-##            if args[2] == 5:      #overdubbing
-##                client2.send( OSCMessage("/lp", [8,args[0],2,2] ) )
-##                #paused, waiting, waitstart/waitstop,overdubbing, oneshot
-
-##            '''state   ::   -1 = unknown,
+##            '''state   ::
+##             -1 = unknown,
 ##		0 = Off
 ##		1 = WaitStart
 ##		2 = Recording
@@ -87,6 +60,18 @@ def sl_state(path, tags, args, source):
 ##		14 = Paused
 ##'''
 
+    
+
+
+
+def sl_state(path, tags, args, source):
+    if path=="/state":  #without len and pos running, works 100% without latency
+            state = int(args[2])
+            
+            looplist[args[0]].state = state
+            
+            client2.send( OSCMessage("/lp2", [8,args[0], Soup.stat[state][0], Soup.stat[state][1] ] ) )
+            
 
 
 def sl_length(path, tags, args, source):  # only sends when theres a NEW length so if run this script when length is already set... issues
@@ -96,23 +81,31 @@ def sl_length(path, tags, args, source):  # only sends when theres a NEW length 
 
 
 def sl_pos(path, tags, args, source):
-    #if path=="/pos":
+    if path=="/sl_pos":
         if looplist[args[0]].state != 2:
             pos =  args[2] 
             
             eigth_pos = int((pos / looplist[args[0]].len) * 8)
             
-            #print args[0], eigth_pos
-            #print 'state', looplist[args[0]].state
+           
             
-            client2.send( OSCMessage("/lp2", [eigth_pos ,args[0],1,0] ) )
-            if eigth_pos > 0:
-                client2.send( OSCMessage("/lp2", [eigth_pos - 1,args[0],0,0] ) )
-            elif eigth_pos == 0:
-                client2.send( OSCMessage("/lp2", [7 ,args[0],0,0] ) )
-        
-        
-                    
+
+            if looplist[args[0]].pos_eigth != eigth_pos:
+                #print args[0], eigth_pos
+                print eigth_pos, looplist[args[0]].pos_eigth
+                
+                looplist[args[0]].pos_eigth = eigth_pos
+                
+                client2.send( OSCMessage("/lp2", [eigth_pos ,args[0],0,1 ] ) )
+                if eigth_pos > 0:
+                    client2.send( OSCMessage("/lp2", [eigth_pos - 1,args[0],0,0] ) )
+                elif eigth_pos == 0:
+                    client2.send( OSCMessage("/lp2", [7 ,args[0],0,0] ) )
+            
+            elif looplist[args[0]].state == 2:
+                for i in range(8):
+                    client2.send( OSCMessage("/lp2", [i,args[0],2,0] ) )
+                        
             
             
 def sl_callback(path, tags, args, source):
@@ -166,7 +159,7 @@ if __name__=="__main__":
     print 'num of loops', Soup.num_loops
     
     for i in range(8):     
-            client.send( OSCMessage("/sl/" + str(i) + "/register_auto_update", ["loop_pos", 50, "localhost:7777", '/sl_pos'] ) )
+            client.send( OSCMessage("/sl/" + str(i) + "/register_auto_update", ["loop_pos", 10, "localhost:7777", '/sl_pos'] ) )
             client.send( OSCMessage("/sl/" + str(i) + "/register_auto_update", ["state", 10, "localhost:7777", '/state'] ) )
             client.send( OSCMessage("/sl/" + str(i) + "/register_auto_update", ["loop_len", 100, "localhost:7777", '/sl_len'] ) )
 
