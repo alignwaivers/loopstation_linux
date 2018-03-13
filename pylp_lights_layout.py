@@ -32,43 +32,34 @@ def handle_error(self,request,client_address):
 
 
 class Lpad():
-    def __init__(self): # for holding values of
-        layout = {} #foreground
+    def __init__(self): # for holding values of modes / color groupings
+        self.fg = {} #foreground
+        self.bg = {}
+        fg = self.fg
+        bg = self.bg
+        
 
         for x in range(9):
             for y in range(9):
-                layout[ (x , y,) ] =  [0,3]
-        del layout[(8,8)]
-
-        print layout
-
-        print '*' * 80
+                fg[ (x , y,) ] =  [0,3]
+        del fg[(8,8)]
         
-        layout2 = {}
-        for items in layout:
-            layout2[items] = 0,0
-
-        print '*' * 80
-
-        print layout2
-
+        
+        for items in fg:
+            bg[items] = 0,0
 
         
-        layout3 = layout.copy()
-        layout4 = layout.copy()
-
-        self.layout = layout   #active presses
-        self.layout2 = layout2 #backgrounds for modes
-        self.layout3 = layout3
-        self.layout4 = layout4
+        self.layout = [fg.copy(), fg.copy(), fg.copy()]
+        print type(self.layout[0])
         
-        self.layouts = [layout, layout2, layout3, layout4]
-        self.mode = 1 #background select
+        self.layouts = [fg,bg] #add more later
+        
+        self.bg_mode = 1 #background select
 
         for r in range(4):
             for c in range(4):
-                layout2[(r,c + 4)] = [r,c]
-        print layout2
+                bg[(r,c + 4)] = [r,c]
+        print bg
 
         
       
@@ -80,14 +71,14 @@ def lp_callback(path, tags, args, source):
 
     #print 'on/off', args[2]
     if args[2] == 1:
-        l.light(x, y, Pad.layout[x,y][0], Pad.layout[(x,y)][1]) 
+        l.light(x, y, Pad.fg[x,y][0], Pad.fg[(x,y)][1]) 
     else:
-        l.light(x, y, Pad.layout2[x,y][0], Pad.layout2[(x,y)][1]) 
+        l.light(x, y, Pad.bg[x,y][0], Pad.bg[(x,y)][1]) 
 
 def lp_layout2(path, tags, args, source):
     
     #print (args[0], args[1]), args[2:]
-    Pad.layout2[args[0], args[1]] =  args[2:]
+    Pad.bg[args[0], args[1]] =  args[2:]
     
     l.light(*args)
 
@@ -100,8 +91,8 @@ def lp_layout2(path, tags, args, source):
 if __name__=="__main__":
 
     server = OSCServer(("127.0.0.1", 8000))
-    server.addMsgHandler( "/lp",lp_callback) #for individual light
-    server.addMsgHandler( "/lp2",lp_layout2) #for layout2
+    server.addMsgHandler( "/lp",lp_callback) #for button presses (foreground)
+    server.addMsgHandler( "/lp2",lp_layout2) #for background
     
     server.handle_error = types.MethodType(handle_error, server)
 
@@ -119,12 +110,14 @@ if __name__=="__main__":
 
         l.reset()
     finally:
-    #default colors hash
+    
         Pad = Lpad()
 
 
-    for items in Pad.layout2: # display layout2
-        l.light(items[0], items[1], Pad.layout2[items][0], Pad.layout2[items][1])
+    for items in Pad.bg: # display bg
+        l.light(items[0], items[1], Pad.bg[items][0], Pad.bg[items][1])
+
+
 
     while True:
         server.handle_request()        
