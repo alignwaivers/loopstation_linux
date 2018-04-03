@@ -77,7 +77,7 @@ class Lpad_lights():
                 
 
     def monochrome(self, layer, red, green): # to make layers one color
-        print 'layer', layer
+        print layer
         layer = Pad.layer_sel[layer]
         
         for i in layer:
@@ -99,7 +99,7 @@ class Lpad_lights():
         #depending on Pad.lmode, presses will light different colors and do different things
         layer = Pad.layer_sel[Pad.mode]
 
-        red = -layer[(x, y)][0] + 3
+        red = -layer[(x, y)][0] + 3 # invert foreground color from background colors
         green = -layer[(x, y)][1] + 3
 
         bg = Pad.layer_sel[Pad.mode]
@@ -121,6 +121,8 @@ def lp_input():
                 x,y = event[0],event[1]
                 
                 note = 0
+
+            
                 
                 #this should probably be a list comprehension
                 if x == 8:
@@ -145,6 +147,10 @@ def lp_input():
                 elif y == 8:
                     note = x + 64 #top row (controls)
 
+                note = 0
+                
+                print note
+
                 
 
                 if note < Pad.lowbound:   #seperate to different midi ports
@@ -157,16 +163,16 @@ def lp_input():
                 if event[2] == 1:
                     #todo - if SL enabled in mode
                     Soop.command(x, y)                    
-                    midisel.send_message([0x90, note + 36, event[2]*127 ])
+                    midisel.send_message([0x90, note, event[2]*127 ])
                     Pad.lighty(event[0], event[1], 1)
 
                     if (x,y) not in Pad.pressed:
                         Pad.pressed[x, y] = 1
 
-                    print Pad.pressed
+                    #print Pad.pressed
                         
                 elif event[2] == 0:
-                    midisel.send_message([0x80, note + 36, event[2]])                    
+                    midisel.send_message([0x80, note, event[2]])                    
                     Pad.lighty(event[0], event[1], 0)
 
                     
@@ -217,6 +223,10 @@ def server_thread():
 
 def callback(path, tags, args, source):
     print 'callllllllback',  args
+
+def input_thread():
+    while Pad.thread == 1:
+        lp_input()
         
     
 def pedal():
@@ -289,15 +299,15 @@ if __name__=="__main__":
         Pad.mode_switch(1)
         sleep(.3)
     #begin threads, should loop based on functions
-    t = threading.Thread(name='pad inputs', target=server_thread) #switched to threading OSC as latency affectd OSC handler
+    t = threading.Thread(name='pad inputs', target=input_thread) #switched to threading OSC as latency affectd OSC handler
     t.start()
 
     sleep(1)
 
     while 1:
         try:
-            #server.handle_request()
-            lp_input()
+            server.handle_request()
+            #lp_input()
             
         except KeyboardInterrupt:
             Pad.thread = 0
