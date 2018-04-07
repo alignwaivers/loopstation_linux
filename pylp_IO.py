@@ -4,7 +4,7 @@ from OSC import OSCServer,OSCClient, OSCMessage
 from time import sleep
 import types, threading
 
-import sl_indy_4
+import sl_indy_5
 
 
 '''python script to control sooperlooper via open sound control (OSC), midi output for instruments and the launchpad '''
@@ -36,7 +36,7 @@ class Lpad_lights():
         bg1 = self.bg1
         bg2 = self.bg2
         
-        self.layer_sel = [fg, bg, bg1, bg2]  # for multiple modes
+        self.layer_sel = [fg, bg, bg1, bg2]  # for different layers
 
         self.pressed = {} #for tracking currently pressed buttons
         pressed = self.pressed
@@ -110,16 +110,20 @@ def lp_input():
 
                 if event[2] == 1: #note on
                     #todo - if SL enabled in mode
-                    '''Soop.command(x, y) refactor '''                    
-                    midisel.send_message([0x90, note, event[2]*127 ])
+                    try:
+                        looplist[y].command(x, y)
+                        midisel.send_message([0x90, note, event[2]*127 ])
                     
-                    Pad.lighty(x, y, 1)
-                        
+                        Pad.lighty(x, y, 1)
+
+                    except IndexError:
+                        pass
+                    
                     if (x,y) not in Pad.pressed:
                         Pad.pressed[x, y] = 1
 
                     #print Pad.pressed
-                        
+                         
                 elif event[2] == 0: #note off
                     midisel.send_message([0x80, note, event[2]])                    
                     Pad.lighty(x, y, 0)
@@ -137,6 +141,8 @@ def handle_error(self,request,client_address):
   
 
 def lp_callback(path, tags, args, source):
+    print 'callback', args
+    
     x, y = args[:2]
 
     #print 'on/off', args[2]
@@ -163,26 +169,84 @@ def input_thread():
     while Pad.thread == 1:
         lp_input()
 
-def sl_osc():
-  pass  
+
+
+def sl_state(path, tags, args, source):
+    if path=="/state":  #without len and pos running, works 100% without latency
+            state = int(args[2])
+            print 'state', state
+            loop = looplist[args[0]]
+            
+            loop.state = state
+            print state
+            
+            x,y = loop.state_clr[state]
+            print x, y
+            #Pad.lighty(loop.
+            
+            #client2.send( OSCMessage("/lp2", [8,args[0], Soup.stat[state][0], Soup.stat[state][1] ] ) )
+                
+
+
+def sl_length(path, tags, args, source):  # only sends when theres a NEW length based on auto_register so if run this script when length is already set... issues
+    if args[1] == "loop_len":
+        looplist[args[0]].len = float(args[2])
         
+        #while recording, red lights == # of seconds recorded
+        sec = int(args[2])
+        if looplist[args[0]].state == 2 and sec < 8:
+            client2.send( OSCMessage("/lp2", (sec,args[0], 2, 0) ) )
+
+
+def sl_pos(path, tags, args, source):
+    #doesn't work till record is pressed after script is going
+    if path=="/sl_pos":
+        if looplist[args[0]].state != 2:
+            pos =  args[2] 
+            
+            eigth_pos = int((pos / looplist[args[0]].len) * 8)
+                
+            if looplist[args[0]].pos_eigth != eigth_pos: #dont repeat values more than once
+                
+                print args[0], eigth_pos
+                
+                looplist[args[0]].pos_eigth = eigth_pos
+                
+                #client2.send( OSCMessage("/lp2", [eigth_pos ,args[0],0,1 ] ) )
+
+                if eigth_pos > 0: #return previous position led to bg color
+                    pass
+                    #client2.send( OSCMessage("/lp2", [eigth_pos - 1,args[0],0,0] ) )
+                elif eigth_pos == 0:
+                    #client2.send( OSCMessage("/lp2", [7 ,args[0],0,0] ) )
+                    pass            
+
+
 if __name__=="__main__":
 
     server = OSCServer(("127.0.0.1", 8000))
     server.addMsgHandler("/lp", lp_callback) #for button presses (foreground)
     server.addMsgHandler("/lp2", lp_background) #for background
-    #server.addMsgHandler( "/ping", callback)
-    
-    
+    #server.addMsgHandler( "/ping", callback)    
     server.handle_error = types.MethodType(handle_error, server)
 
+    slserver = OSCServer(("127.0.0.1", 7777))
+    slserver.addMsgHandler("/state", sl_state)
+    slserver.addMsgHandler("/sl_len", sl_length)
+    slserver.addMsgHandler("/sl_pos", sl_pos) #for background
+    slserver.handle_error = types.MethodType(handle_error, server)
+    
 
     slcli = OSCClient() #send to sooperlooper
     slcli.connect( ("localhost", 9951) ) 
 
-    Soop = sl_indy_4.Loop()
-    Soop.command(2, 3)
-    command(2,3)
+    S = sl_indy_5.Loop(slcli)
+    S1 = sl_indy_5.Loop(slcli)
+    S2 = sl_indy_5.Loop(slcli)
+    S3 = sl_indy_5.Loop(slcli)
+    
+    looplist = [S, S1, S2, S3]
+          
 
     #initialize midi outputs
     midi_low = rtmidi.MidiOut(name = "RtMidi Low:")
@@ -229,26 +293,27 @@ if __name__=="__main__":
     t = threading.Thread(name='pad inputs', target=input_thread) #switched to threading OSC as latency affectd OSC handler
     t.start()
 
+
     
-    Soop = sl_indy_4.Loop(slcli)
-    Soop.command(2, 3)
-    command(2,3)
+    
 
     for i in range(2): #must do twice to determine the connection failed?
         try:
-            slcli.send( OSCMessage("/ping", ["localhost:8000", '/sl'] ) )
+            slcli.send( OSCMessage("/ping", ["localhost:7777", '/sl'] ) )
         except:
             print "Connection refused"
             #Pad.mode == 'off'
 
     #register for loops being added        
-    slicli.send( OSCMessage("/register", ["localhost:8000", '/sl'] ) )
+    slcli.send( OSCMessage("/register", ["localhost:7777", '/sl'] ) )
     
 
     while 1:
         try:
             server.handle_request()
+            slserver.handle_request()
             #lp_input()
+            print 'hi'
             
         except KeyboardInterrupt:
             Pad.thread = 0
