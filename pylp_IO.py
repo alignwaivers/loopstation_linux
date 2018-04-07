@@ -64,7 +64,8 @@ class Lpad_lights():
         
  
     def bg_switch(self, mode):
-        '''switch mode''' 
+        '''switch mode'''
+        
         newbg = self.layer_sel[mode]
         print 'bg_switch', mode
         for buttons in newbg:
@@ -138,7 +139,8 @@ def handle_error(self,request,client_address):
     print self, request, client_address ##additional details
 
 
-  
+def gen_callback(path, tags, args, source):
+    print args  
 
 def lp_callback(path, tags, args, source):
     print 'callback', args
@@ -172,6 +174,7 @@ def input_thread():
 
 
 def sl_state(path, tags, args, source):
+    print 'sl_state', args
     if path=="/state":  #without len and pos running, works 100% without latency
             state = int(args[2])
             print 'state', state
@@ -189,6 +192,7 @@ def sl_state(path, tags, args, source):
 
 
 def sl_length(path, tags, args, source):  # only sends when theres a NEW length based on auto_register so if run this script when length is already set... issues
+    print 'sl_length', args
     if args[1] == "loop_len":
         looplist[args[0]].len = float(args[2])
         
@@ -199,6 +203,7 @@ def sl_length(path, tags, args, source):  # only sends when theres a NEW length 
 
 
 def sl_pos(path, tags, args, source):
+    print 'sl_pos', args
     #doesn't work till record is pressed after script is going
     if path=="/sl_pos":
         if looplist[args[0]].state != 2:
@@ -227,25 +232,27 @@ if __name__=="__main__":
     server = OSCServer(("127.0.0.1", 8000))
     server.addMsgHandler("/lp", lp_callback) #for button presses (foreground)
     server.addMsgHandler("/lp2", lp_background) #for background
+    server.addMsgHandler("/bg", gen_callback)
     #server.addMsgHandler( "/ping", callback)    
-    server.handle_error = types.MethodType(handle_error, server)
+    #server.handle_error = types.MethodType(handle_error, server)
 
     slserver = OSCServer(("127.0.0.1", 7777))
     slserver.addMsgHandler("/state", sl_state)
     slserver.addMsgHandler("/sl_len", sl_length)
     slserver.addMsgHandler("/sl_pos", sl_pos) #for background
-    slserver.handle_error = types.MethodType(handle_error, server)
+    #slserver.handle_error = types.MethodType(handle_error, server)
     
 
     slcli = OSCClient() #send to sooperlooper
     slcli.connect( ("localhost", 9951) ) 
-
+    
     S = sl_indy_5.Loop(slcli)
     S1 = sl_indy_5.Loop(slcli)
     S2 = sl_indy_5.Loop(slcli)
     S3 = sl_indy_5.Loop(slcli)
     
     looplist = [S, S1, S2, S3]
+
           
 
     #initialize midi outputs
@@ -276,6 +283,7 @@ if __name__=="__main__":
         l.reset()
     except IndexError:
         print "launchpad not found"
+        l = 0
 
     Pad = Lpad_lights() #init
     Pad.monochrome(0, 0, 3) #fg
@@ -283,19 +291,17 @@ if __name__=="__main__":
     
 
     #display / cycle through modes, end with bg (default background)
-    for i in range(3):
-        Pad.bg_switch(3)
-        Pad.bg_switch(2)
-        Pad.bg_switch(0)   
-        Pad.bg_switch(1)
-        sleep(.3)
+    if l: #if launchpad found
+        for i in range(3):
+            Pad.bg_switch(3)
+            Pad.bg_switch(2)
+            Pad.bg_switch(0)   
+            Pad.bg_switch(1)
+            sleep(.3)
     #begin threads, should loop based on functions
     t = threading.Thread(name='pad inputs', target=input_thread) #switched to threading OSC as latency affectd OSC handler
     t.start()
 
-
-    
-    
 
     for i in range(2): #must do twice to determine the connection failed?
         try:
